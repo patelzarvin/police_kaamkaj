@@ -1,0 +1,37 @@
+# Free demo deploy (no card) — API + static dashboard, no live video
+# Use render.yaml for full localhost parity when card + credits are available
+
+services:
+  - type: web
+    name: police-kaamkaj-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: RENDER_DEMO_MODE
+        value: "true"
+      - key: ENABLE_LIVE_PIPELINE
+        value: "false"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/sentinel.db
+
+  - type: web
+    name: police-kaamkaj-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: police-kaamkaj-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
