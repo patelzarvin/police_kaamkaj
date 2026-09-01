@@ -1,6 +1,6 @@
 import { CameraAsset, DetectionEvent, VehicleJourney, WatchlistEntry, AlertNotification, SystemMetrics } from '../types';
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 type CacheEntry<T> = { data: T; expires: number };
 const cache = new Map<string, CacheEntry<unknown>>();
