@@ -1,32 +1,37 @@
-# Render.com free hosting — no VPS required
-# Dashboard: https://dashboard.render.com → New → Blueprint → connect GitHub repo
+# Render.com — hackathon credits ($100) → Starter plan (always-on, no cold starts)
+# Deploy: https://dashboard.render.com → New → Blueprint → connect patelzarvin/police_kaamkaj
 
 services:
   - type: web
-    name: sentinel-api
-    runtime: docker
-    dockerfilePath: ./docker/Dockerfile.backend
-    dockerContext: .
-    plan: free
+    name: police-kaamkaj-api
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL
-        value: sqlite+aiosqlite:///./data/sentinel.db
-      - key: ENABLE_LIVE_PIPELINE
-        value: "false"
-      - key: MAX_CONCURRENT_STREAMS
-        value: "2"
-      - key: PIPELINE_STARTUP_DELAY_SEC
-        value: "10"
       - key: PYTHON_VERSION
         value: "3.11.0"
+      - key: RENDER_DEMO_MODE
+        value: "true"
+      - key: ENABLE_LIVE_PIPELINE
+        value: "false"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/sentinel.db
 
   - type: web
-    name: sentinel-dashboard
+    name: police-kaamkaj-web
     runtime: static
-    buildCommand: cd frontend && npm install && VITE_API_URL=https://sentinel-api.onrender.com/api npm run build
-    staticPublishPath: frontend/dist
-    plan: free
+    plan: starter
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: police-kaamkaj-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
     routes:
       - type: rewrite
         source: /*

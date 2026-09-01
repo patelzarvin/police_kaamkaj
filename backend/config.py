@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     STREAM_MAX_FRAME_WIDTH: int = 640
     STREAM_START_STAGGER_SEC: float = 0.75
 
+    # Render.com demo mode (skips OpenCV/YOLO imports)
+    RENDER_DEMO_MODE: bool = False
+
     # AI pipeline tuning
     ENABLE_LIVE_PIPELINE: bool = True
     PIPELINE_FRAME_WIDTH: int = 640

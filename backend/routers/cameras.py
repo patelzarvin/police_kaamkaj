@@ -9,7 +9,7 @@ from backend.database import get_db
 from backend.models import Camera, CameraHealth
 from backend.schemas import CameraResponse, CameraHealthResponse
 from backend.config import settings
-from ai.pipeline import global_health_tracker
+from backend.demo_mode import RENDER_DEMO_MODE
 from database.seeds.seed_data import CAMERAS_DATA
 
 router = APIRouter(prefix="/api/cameras", tags=["Camera Registry"])
@@ -17,6 +17,14 @@ router = APIRouter(prefix="/api/cameras", tags=["Camera Registry"])
 from backend.integrations.sentinel import SentinelCatalogClient
 
 catalog_client = SentinelCatalogClient()
+
+
+def _get_frame_jpeg(camera_id: str) -> bytes:
+    if RENDER_DEMO_MODE:
+        from backend.demo_frames import placeholder_jpeg
+        return placeholder_jpeg(camera_id)
+    from ai.pipeline import global_health_tracker
+    return global_health_tracker.get_latest_frame_jpeg(camera_id)
 
 @router.get("", response_model=List[CameraResponse])
 async def list_cameras(
@@ -62,7 +70,7 @@ async def get_camera_mjpeg_stream(camera_id: str):
     """
     async def mjpeg_generator():
         while True:
-            jpeg_bytes = global_health_tracker.get_latest_frame_jpeg(camera_id)
+            jpeg_bytes = _get_frame_jpeg(camera_id)
             if jpeg_bytes:
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + jpeg_bytes + b'\r\n')
@@ -76,7 +84,7 @@ async def get_camera_latest_frame(camera_id: str):
     Returns the latest single live JPEG frame decoded by the AI stream worker.
     Always returns a valid JPEG image (with smooth dark fallback) to prevent UI flickering.
     """
-    jpeg_bytes = global_health_tracker.get_latest_frame_jpeg(camera_id)
+    jpeg_bytes = _get_frame_jpeg(camera_id)
     return Response(
         content=jpeg_bytes,
         media_type="image/jpeg",

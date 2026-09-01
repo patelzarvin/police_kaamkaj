@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, Optional
 
 from backend.config import settings
-from stream_gateway.stream_manager import StreamManager
+from backend.demo_mode import RENDER_DEMO_MODE
 from backend.models import Camera
 
 router = APIRouter(prefix="/api/sentinel", tags=["Sentinel Live Sandbox Integration"])
@@ -20,9 +20,15 @@ async def get_sentinel_live_status():
     Requirement 15: Backend health/status endpoint for Sentinel Sandbox Integration.
     Shows catalogue reachability, cameras discovered, live cameras, connected streams, frames received, and auth/connection errors.
     """
+    if RENDER_DEMO_MODE:
+        return {
+            "status": "DEMO",
+            "message": "Live Sentinel streams disabled on Render demo deployment",
+            "active_streams": 0,
+            "cameras_discovered": 8,
+        }
     from backend.main import stream_manager
-    status = stream_manager.get_sentinel_status()
-    return status
+    return stream_manager.get_sentinel_status()
 
 @router.post("/credentials")
 async def update_sentinel_credentials(creds: CredentialsRequest):
@@ -38,6 +44,14 @@ async def update_sentinel_credentials(creds: CredentialsRequest):
         settings.SENTINEL_AUTH_TOKEN = creds.auth_token
     if creds.sentinel_host:
         settings.SENTINEL_HOST = creds.sentinel_host
+
+    if RENDER_DEMO_MODE:
+        return {
+            "status": "DEMO",
+            "message": "Credential updates disabled in Render demo mode",
+            "sentinel_host": settings.SENTINEL_HOST,
+            "cameras_discovered": 8,
+        }
 
     from backend.main import stream_manager
     cams = stream_manager.refresh_sentinel_catalogue()

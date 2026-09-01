@@ -13,23 +13,35 @@ from backend.config import settings
 from backend.database import AsyncSessionLocal
 from backend.models import Camera, Detection, Alert
 from backend.schemas import SystemHealthSummary
-from backend.routers import auth, ingest, cameras, detections, vehicles, watchlist, alerts, sentinel, video_intelligence, sentinel_auth
+from backend.routers import auth, ingest, cameras, detections, vehicles, watchlist, alerts, sentinel, sentinel_auth
 from backend.ws_manager import ws_manager
 from database.seeds.seed_data import seed_database
-from stream_gateway.stream_manager import StreamManager
-from ai.pipeline import SentinelAIPipeline, global_health_tracker
+from backend.demo_mode import RENDER_DEMO_MODE, demo_health_tracker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("sentinel.main")
 
-stream_manager = StreamManager()
-ai_pipeline = SentinelAIPipeline(stream_manager)
+if RENDER_DEMO_MODE:
+    logger.info("RENDER_DEMO_MODE enabled — skipping live AI/stream imports")
+    global_health_tracker = demo_health_tracker
+    stream_manager = None
+    ai_pipeline = None
+else:
+    from stream_gateway.stream_manager import StreamManager
+    from ai.pipeline import SentinelAIPipeline, global_health_tracker as _pipeline_tracker
+    from backend.routers import video_intelligence
+
+    global_health_tracker = _pipeline_tracker
+    stream_manager = StreamManager()
+    ai_pipeline = SentinelAIPipeline(stream_manager)
 
 _health_cache: dict = {"data": None, "expires": 0.0}
 
 
 async def _deferred_pipeline_start():
     """Let the API serve requests instantly before heavy AI/stream work begins."""
+    if ai_pipeline is None:
+        return
     await asyncio.sleep(settings.PIPELINE_STARTUP_DELAY_SEC)
     if settings.ENABLE_LIVE_PIPELINE:
         logger.info("Starting deferred background AI pipeline...")
@@ -40,16 +52,23 @@ async def _deferred_pipeline_start():
 async def lifespan(app: FastAPI):
     logger.info("Initializing Gujarat Police Sentinel Core Services...")
     await seed_database()
-    pipeline_task = asyncio.create_task(_deferred_pipeline_start())
-    logger.info(f"API ready — AI pipeline starts in {settings.PIPELINE_STARTUP_DELAY_SEC}s")
+    pipeline_task = None
+    if not RENDER_DEMO_MODE and settings.ENABLE_LIVE_PIPELINE:
+        pipeline_task = asyncio.create_task(_deferred_pipeline_start())
+        logger.info(f"API ready — AI pipeline starts in {settings.PIPELINE_STARTUP_DELAY_SEC}s")
+    else:
+        logger.info("API ready — demo mode (no live pipeline)")
     yield
-    ai_pipeline.stop()
-    stream_manager.stop_all()
-    pipeline_task.cancel()
-    try:
-        await pipeline_task
-    except asyncio.CancelledError:
-        pass
+    if ai_pipeline is not None:
+        ai_pipeline.stop()
+    if stream_manager is not None:
+        stream_manager.stop_all()
+    if pipeline_task is not None:
+        pipeline_task.cancel()
+        try:
+            await pipeline_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
@@ -77,7 +96,8 @@ app.include_router(detections.router)
 app.include_router(vehicles.router)
 app.include_router(watchlist.router)
 app.include_router(alerts.router)
-app.include_router(video_intelligence.router, prefix="/api")
+if not RENDER_DEMO_MODE:
+    app.include_router(video_intelligence.router, prefix="/api")
 
 os.makedirs("static/crops", exist_ok=True)
 os.makedirs("data/crops", exist_ok=True)
@@ -127,9 +147,9 @@ async def system_health_metrics():
         degraded_cameras=0,
         total_detections_24h=det_count,
         active_alerts=alert_count,
-        ai_workers_active=4,
+        ai_workers_active=0 if RENDER_DEMO_MODE else 4,
         avg_inference_ms=global_health_tracker.last_inference_ms or 22.4,
-        stream_gateway_status="REAL_VIDEO_PROCESSING",
+        stream_gateway_status="RENDER_DEMO" if RENDER_DEMO_MODE else "REAL_VIDEO_PROCESSING",
         uptime_seconds=round(time.time() - global_health_tracker.start_time, 1)
     )
     _health_cache["data"] = summary
