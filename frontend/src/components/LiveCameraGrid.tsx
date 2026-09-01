@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CameraAsset } from '../types';
+import { apiUrl } from '../services/api';
 import { Radio, Eye, Video, Cpu, Play, Square, X } from 'lucide-react';
 
 interface LiveCameraGridProps {
@@ -55,7 +56,7 @@ export const LiveCameraGrid: React.FC<LiveCameraGridProps> = ({ cameras, onSelec
             const cid = cam.camera_id;
             const isSelected = selectedCam?.camera_id === cid;
             const isAIProcessing = !!activeAIProcessingCams[cid];
-            const frameUrl = `/api/cameras/${cid}/frame?v=${snapshotTick}`;
+            const frameUrl = `${apiUrl(`/api/cameras/${cid}/frame`)}?v=${snapshotTick}`;
 
             return (
               <div
@@ -133,7 +134,7 @@ export const LiveCameraGrid: React.FC<LiveCameraGridProps> = ({ cameras, onSelec
             </div>
             <div className="relative bg-black aspect-video rounded-xl overflow-hidden border border-cyan-900">
               <img
-                src={`/api/cameras/${viewingHlsCam.camera_id}/stream`}
+                src={apiUrl(`/api/cameras/${viewingHlsCam.camera_id}/stream`)}
                 alt={viewingHlsCam.name}
                 className="w-full h-full object-contain"
               />

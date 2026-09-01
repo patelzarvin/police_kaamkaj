@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Film, Play, Search, Cpu, RefreshCw, CheckCircle, AlertTriangle, Shield, Eye, Layers, Clock, Grid, Image as ImageIcon, Sparkles } from 'lucide-react';
-import { fetchLocalVideos, processLocalVideo, fetchVideoDetections, searchVideoPlates, fetchVideoSummary, fetchDiscoveredPlates } from '../services/api';
+import { fetchLocalVideos, processLocalVideo, fetchVideoDetections, searchVideoPlates, fetchVideoSummary, fetchDiscoveredPlates, apiUrl } from '../services/api';
 
 export interface LocalVideoAsset {
   video_id: string;
@@ -530,7 +530,7 @@ export const VideoIntelligenceView: React.FC = () => {
             {/* HTML5 VIDEO ELEMENT WITH HIGH-PERFORMANCE STREAMING */}
             <video
               ref={videoRef}
-              src={`/api/videos/${selectedVideo.video_id}/stream`}
+              src={apiUrl(`/api/videos/${selectedVideo.video_id}/stream`)}
               controls
               playsInline
               preload="metadata"

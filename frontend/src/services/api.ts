@@ -7,6 +7,12 @@ const API_BASE = (() => {
   return base.endsWith('/api') ? base : `${base}/api`;
 })();
 
+/** Build full API URL for fetch/img src (works on Render split deploy). */
+export function apiUrl(path: string): string {
+  const suffix = path.startsWith('/api') ? path.slice(4) : path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE}${suffix}`;
+}
+
 type CacheEntry<T> = { data: T; expires: number };
 const cache = new Map<string, CacheEntry<unknown>>();
 
