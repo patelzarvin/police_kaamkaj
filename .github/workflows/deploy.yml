@@ -1,26 +1,45 @@
 name: Deploy to Production
 
+# Runs only when you manually trigger it OR when DEPLOY_ENABLED repo variable is set to "true"
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-  workflow_dispatch:
 
 jobs:
   deploy:
+    # Set repository variable DEPLOY_ENABLED=true after VPS secrets are configured
+    if: github.event_name == 'workflow_dispatch' || vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Verify deploy secrets are configured
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_SSH_KEY" ]; then
+            echo "::error::Missing GitHub secrets. Add VPS_HOST, VPS_USER, VPS_SSH_KEY in repo Settings → Secrets → Actions."
+            echo "See docs/DEPLOY.md for setup steps."
+            exit 1
+          fi
+          echo "Deploy secrets present. Connecting to $VPS_HOST as $VPS_USER..."
+
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          port: 22
           script: |
             set -e
-            cd ${{ secrets.DEPLOY_PATH || '/opt/sentinel' }}
+            DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
+            if [ -z "$DEPLOY_PATH" ]; then DEPLOY_PATH="/opt/sentinel"; fi
+            cd "$DEPLOY_PATH"
             git fetch origin main
             git reset --hard origin/main
             docker compose pull || true
             docker compose up -d --build
             docker image prune -f
+            echo "Deploy complete."

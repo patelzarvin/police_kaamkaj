@@ -34,8 +34,16 @@ Open: `http://YOUR_SERVER_IP:3000`
 | `VPS_HOST` | `123.45.67.89` |
 | `VPS_USER` | `root` |
 | `VPS_SSH_KEY` | Private SSH key (full PEM) |
-| `VPS_PORT` | `22` (optional) |
-| `DEPLOY_PATH` | `/opt/sentinel` (optional) |
+
+## GitHub Variables (Settings → Secrets → Actions → Variables)
+
+| Variable | Value | When |
+|----------|-------|------|
+| `DEPLOY_ENABLED` | `true` | After VPS + secrets are ready |
+| `DEPLOY_PATH` | `/opt/sentinel` | Optional |
+
+Until `DEPLOY_ENABLED=true`, pushes only run **CI tests** (not deploy).  
+Manual deploy: GitHub → Actions → "Deploy to Production" → Run workflow.
 
 ## Team workflow
 
