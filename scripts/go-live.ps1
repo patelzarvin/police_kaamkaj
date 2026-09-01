@@ -10,6 +10,29 @@ Write-Host ""
 Write-Host "=== Gujarat Police Sentinel - Go Live (Full Stack) ===" -ForegroundColor Cyan
 Write-Host ""
 
+function Stop-PortProcess([int]$Port) {
+    $matches = netstat -ano | Select-String "LISTENING" | Select-String ":$Port\s"
+    foreach ($line in $matches) {
+        $procId = ($line.ToString().Trim() -split '\s+')[-1]
+        if ($procId -match '^\d+$' -and [int]$procId -gt 0) {
+            Stop-Process -Id ([int]$procId) -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Wait-ForHttp([string]$Url, [int]$TimeoutSec = 90) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 4
+            if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500) { return $true }
+        } catch {
+            Start-Sleep -Seconds 2
+        }
+    }
+    return $false
+}
+
 function Resolve-Python {
     $venvPy = Join-Path $Root ".venv\Scripts\python.exe"
     if (Test-Path $venvPy) { return $venvPy }
@@ -24,10 +47,15 @@ function Resolve-PythonArgs([string]$exe) {
     return @()
 }
 
+Write-Host "[0/6] Freeing ports 3000 and 8000..." -ForegroundColor Yellow
+Stop-PortProcess 3000
+Stop-PortProcess 8000
+Start-Sleep -Seconds 2
+
 $python = Resolve-Python
 $pyArgs = Resolve-PythonArgs $python
 
-Write-Host "[1/5] Checking Python dependencies..." -ForegroundColor Yellow
+Write-Host "[1/6] Checking Python dependencies..." -ForegroundColor Yellow
 $depsOk = $true
 try {
     & $python @pyArgs -c "import fastapi, cv2, ultralytics" 2>$null
@@ -41,7 +69,7 @@ if (-not $depsOk) {
     if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 }
 
-Write-Host "[2/5] Checking cloudflared tunnel..." -ForegroundColor Yellow
+Write-Host "[2/6] Checking cloudflared tunnel..." -ForegroundColor Yellow
 if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
     Write-Host "      Installing cloudflared via winget..." -ForegroundColor Gray
     winget install --id Cloudflare.cloudflared -e --accept-source-agreements --accept-package-agreements
@@ -50,7 +78,7 @@ if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
     $env:Path = $machinePath + ';' + $userPath
 }
 
-Write-Host "[3/5] Starting backend on :8000..." -ForegroundColor Green
+Write-Host "[3/6] Starting backend on :8000..." -ForegroundColor Green
 $env:RENDER_DEMO_MODE = "false"
 $env:ENABLE_LIVE_PIPELINE = "true"
 $env:SENTINEL_RTSP_HOST = "103.250.160.189"
@@ -60,17 +88,24 @@ $uvicornArgs = $pyArgs + @("-m", "uvicorn", "backend.main:app", "--host", "127.0
 $backend = Start-Process -PassThru -WindowStyle Minimized -FilePath $python -ArgumentList $uvicornArgs -WorkingDirectory $Root
 Start-Sleep -Seconds 5
 
-Write-Host "[4/5] Starting frontend on :3000..." -ForegroundColor Green
+Write-Host "[4/6] Starting frontend on :3000..." -ForegroundColor Green
 if (-not (Test-Path "$Root\frontend\node_modules")) {
     Write-Host "      Running npm install..." -ForegroundColor Gray
     Push-Location "$Root\frontend"
     npm install --silent
     Pop-Location
 }
-$frontend = Start-Process -PassThru -WindowStyle Minimized -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev" -WorkingDirectory "$Root\frontend"
-Start-Sleep -Seconds 8
+$frontend = Start-Process -PassThru -WindowStyle Minimized -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev -- --port 3000 --strictPort" -WorkingDirectory "$Root\frontend"
 
-Write-Host "[5/5] Opening public tunnel..." -ForegroundColor Green
+Write-Host "[5/6] Waiting for dashboard on :3000..." -ForegroundColor Yellow
+if (-not (Wait-ForHttp "http://localhost:3000")) {
+    Write-Host "ERROR: Frontend did not start on port 3000. Close other dev servers and retry." -ForegroundColor Red
+    Stop-Process -Id $backend.Id -Force -ErrorAction SilentlyContinue
+    Stop-Process -Id $frontend.Id -Force -ErrorAction SilentlyContinue
+    exit 1
+}
+
+Write-Host "[6/6] Opening public tunnel..." -ForegroundColor Green
 Write-Host ""
 Write-Host "  Local dashboard:  http://localhost:3000" -ForegroundColor White
 Write-Host "  Share this URL (appears below in ~10 sec):" -ForegroundColor Yellow
@@ -83,4 +118,6 @@ try {
     Write-Host "Shutting down..." -ForegroundColor Gray
     Stop-Process -Id $backend.Id -Force -ErrorAction SilentlyContinue
     Stop-Process -Id $frontend.Id -Force -ErrorAction SilentlyContinue
+    Stop-PortProcess 3000
+    Stop-PortProcess 8000
 }
