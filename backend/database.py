@@ -11,6 +11,14 @@ RAW_DB_URL = os.getenv(
     "sqlite+aiosqlite:///./sentinel_dev.db"
 )
 
+# Ensure SQLite parent directory exists before engine connects (Render ephemeral disk)
+if RAW_DB_URL.startswith("sqlite"):
+    _sqlite_path = RAW_DB_URL.split("///", 1)[-1]
+    if _sqlite_path and _sqlite_path not in (":memory:", "/:memory:"):
+        _dir = os.path.dirname(_sqlite_path)
+        if _dir:
+            os.makedirs(_dir, exist_ok=True)
+
 # Handle postgresql:// to postgresql+asyncpg:// normalization
 if RAW_DB_URL.startswith("postgresql://"):
     ASYNC_DB_URL = RAW_DB_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
