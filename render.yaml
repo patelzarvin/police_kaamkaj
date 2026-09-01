@@ -1,37 +1,25 @@
-# Render.com — free tier (no card required)
+# Full-stack live deploy — same experience as localhost (RTSP + YOLO + UI on one URL)
+# Requires payment method on Render (hackathon credits apply). Uses Standard 2GB RAM.
 # Deploy: dashboard.render.com → New → Blueprint → patelzarvin/police_kaamkaj
 
 services:
   - type: web
-    name: police-kaamkaj-api
-    runtime: python
-    plan: free
-    buildCommand: pip install -r requirements-render.txt
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    name: police-kaamkaj
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11.0"
-      - key: RENDER_DEMO_MODE
+      - key: SERVE_FRONTEND
         value: "true"
-      - key: ENABLE_LIVE_PIPELINE
+      - key: RENDER_DEMO_MODE
         value: "false"
+      - key: ENABLE_LIVE_PIPELINE
+        value: "true"
+      - key: MAX_CONCURRENT_STREAMS
+        value: "4"
+      - key: PIPELINE_STARTUP_DELAY_SEC
+        value: "8"
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./data/sentinel.db
-
-  - type: web
-    name: police-kaamkaj-web
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          name: police-kaamkaj-api
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html

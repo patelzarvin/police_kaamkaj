@@ -3,10 +3,11 @@ import time
 import logging
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy import select, func
 
 from backend.config import settings
@@ -155,6 +156,28 @@ async def system_health_metrics():
     _health_cache["data"] = summary
     _health_cache["expires"] = now + settings.HEALTH_CACHE_TTL_SEC
     return summary
+
+
+SERVE_FRONTEND = os.getenv("SERVE_FRONTEND", "").lower() == "true"
+_FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+
+if SERVE_FRONTEND and os.path.isdir(_FRONTEND_DIST):
+    _assets_dir = os.path.join(_FRONTEND_DIST, "assets")
+    if os.path.isdir(_assets_dir):
+        app.mount("/assets", StaticFiles(directory=_assets_dir), name="frontend_assets")
+
+    @app.get("/")
+    async def serve_frontend_root():
+        return FileResponse(os.path.join(_FRONTEND_DIST, "index.html"))
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend_spa(full_path: str):
+        if full_path.startswith(("api/", "ws/", "static/", "data/")):
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = os.path.join(_FRONTEND_DIST, full_path)
+        if os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_FRONTEND_DIST, "index.html"))
 
 
 if __name__ == "__main__":
