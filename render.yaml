@@ -1,11 +1,11 @@
-# Render.com — hackathon credits ($100) → Starter plan (always-on, no cold starts)
-# Deploy: https://dashboard.render.com → New → Blueprint → connect patelzarvin/police_kaamkaj
+# Render.com — free tier (no card required)
+# Deploy: dashboard.render.com → New → Blueprint → patelzarvin/police_kaamkaj
 
 services:
   - type: web
     name: police-kaamkaj-api
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements-render.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
@@ -22,7 +22,6 @@ services:
   - type: web
     name: police-kaamkaj-web
     runtime: static
-    plan: starter
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
