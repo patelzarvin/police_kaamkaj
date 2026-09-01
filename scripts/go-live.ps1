@@ -1,5 +1,5 @@
 # One-click: full project live on the web (no card, no Render paid plan)
-# Identical to localhost — live RTSP, YOLO, journey search, everything.
+# Same as localhost - live RTSP, YOLO, journey search.
 # Run: double-click GO-LIVE.bat  OR  .\scripts\go-live.ps1
 
 $ErrorActionPreference = "Stop"
@@ -7,7 +7,7 @@ $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 Write-Host ""
-Write-Host "=== Gujarat Police Sentinel — Go Live (Full Stack) ===" -ForegroundColor Cyan
+Write-Host "=== Gujarat Police Sentinel - Go Live (Full Stack) ===" -ForegroundColor Cyan
 Write-Host ""
 
 function Resolve-Python {
@@ -28,8 +28,14 @@ $python = Resolve-Python
 $pyArgs = Resolve-PythonArgs $python
 
 Write-Host "[1/5] Checking Python dependencies..." -ForegroundColor Yellow
-& $python @pyArgs -c "import fastapi, cv2, ultralytics" 2>$null
-if ($LASTEXITCODE -ne 0) {
+$depsOk = $true
+try {
+    & $python @pyArgs -c "import fastapi, cv2, ultralytics" 2>$null
+    if ($LASTEXITCODE -ne 0) { $depsOk = $false }
+} catch {
+    $depsOk = $false
+}
+if (-not $depsOk) {
     Write-Host "      Installing backend requirements (first run may take a few minutes)..." -ForegroundColor Gray
     & $python @pyArgs -m pip install -r requirements.txt -q
     if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
@@ -39,13 +45,16 @@ Write-Host "[2/5] Checking cloudflared tunnel..." -ForegroundColor Yellow
 if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
     Write-Host "      Installing cloudflared via winget..." -ForegroundColor Gray
     winget install --id Cloudflare.cloudflared -e --accept-source-agreements --accept-package-agreements
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+    $machinePath = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $userPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    $env:Path = $machinePath + ';' + $userPath
 }
 
 Write-Host "[3/5] Starting backend on :8000..." -ForegroundColor Green
 $env:RENDER_DEMO_MODE = "false"
 $env:ENABLE_LIVE_PIPELINE = "true"
-$backend = Start-Process -PassThru -WindowStyle Minimized -FilePath $python -ArgumentList (@pyArgs + @("-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000")) -WorkingDirectory $Root
+$uvicornArgs = $pyArgs + @("-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000")
+$backend = Start-Process -PassThru -WindowStyle Minimized -FilePath $python -ArgumentList $uvicornArgs -WorkingDirectory $Root
 Start-Sleep -Seconds 5
 
 Write-Host "[4/5] Starting frontend on :3000..." -ForegroundColor Green
