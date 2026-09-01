@@ -1,0 +1,30 @@
+# Multi-stage Python 3.11 build for Gujarat Police Sentinel Backend Core
+FROM python:3.11-slim
+
+# System dependencies for OpenCV, PostGIS drivers, and networking
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ffmpeg \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application source code
+COPY . .
+
+# Ensure storage directories exist
+RUN mkdir -p data/videos data/crops data/plates data/vehicle_crops data/frames static/crops
+
+EXPOSE 8000
+
+# Run FastAPI backend with Uvicorn
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: sentinel-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel_secure_pass_2026
+      POSTGRES_DB: sentinel_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentinel-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: sentinel-mediamtx
+    restart: always
+    ports:
+      - "8554:8554"  # RTSP
+      - "8888:8888"  # HLS
+      - "8889:8889"  # WebRTC
+      - "8555:8555/udp" # WebRTC ICE
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: sentinel-backend
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://sentinel:sentinel_secure_pass_2026@postgres:5432/sentinel_db
+      - REDIS_URL=redis://redis:6379/0
+      - SENTINEL_CATALOG_URL=http://backend:8000/api/ingest
+      - MAX_CONCURRENT_STREAMS=4
+      - YOLO_ENABLE_TILING=false
+      - PIPELINE_STARTUP_DELAY_SEC=5
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: sentinel-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:

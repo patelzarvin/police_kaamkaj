@@ -1,0 +1,73 @@
+# Environment and Secrets
+.env
+*.env
+!.env.example
+*.pem
+*.key
+
+# Local databases
+*.db
+sentinel_dev.db
+
+# ML weights (download on server)
+yolov8n.pt
+*.pt
+
+# Scratch / temp
+scratch/
+.pytest_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Data and Weights (Exclude large model files and raw footage)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/videos/*
+!data/videos/.gitkeep
+data/plates/*
+!data/plates/.gitkeep
+data/vehicle_crops/*
+!data/vehicle_crops/.gitkeep
+ai/models/*.pt
+ai/models/*.onnx
+ai/models/*.engine
+
+# Node / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/dist/
+frontend/build/
+
+# IDE & System
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
