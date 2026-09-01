@@ -19,11 +19,37 @@ from backend.integrations.sentinel import SentinelCatalogClient
 catalog_client = SentinelCatalogClient()
 
 
+def _camera_display_order(camera_id: str) -> tuple:
+    """Sort cam01, cam02... first so grid matches live pipeline streams."""
+    cid = camera_id.lower()
+    if cid.startswith("cam") and len(cid) > 3 and cid[3:].isdigit():
+        return (0, int(cid[3:]))
+    if cid.startswith("cam-"):
+        return (1, cid)
+    return (2, cid)
+
+
 def _get_frame_jpeg(camera_id: str) -> bytes:
     if RENDER_DEMO_MODE:
         from backend.demo_frames import placeholder_jpeg
         return placeholder_jpeg(camera_id)
     from ai.pipeline import global_health_tracker
+    cached = global_health_tracker.latest_frames.get(camera_id)
+    if cached:
+        return cached
+    try:
+        from backend.main import stream_manager
+        if stream_manager is not None:
+            frame_data = stream_manager.get_frame(camera_id)
+            if frame_data:
+                import cv2
+                frame, _, _ = frame_data
+                if frame is not None and getattr(frame, "size", 0) > 0:
+                    ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                    if ok:
+                        return buf.tobytes()
+    except Exception:
+        pass
     return global_health_tracker.get_latest_frame_jpeg(camera_id)
 
 @router.get("", response_model=List[CameraResponse])
@@ -52,6 +78,7 @@ async def list_cameras(
         result = await db.execute(stmt)
         cams = result.scalars().all()
 
+    cams.sort(key=lambda c: _camera_display_order(c.camera_id))
     return cams
 
 @router.get("/{camera_id}", response_model=CameraResponse)

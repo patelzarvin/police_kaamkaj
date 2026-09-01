@@ -9,7 +9,7 @@ interface LiveCameraGridProps {
 }
 
 const VISIBLE_LIMIT = 4;
-const SNAPSHOT_INTERVAL_MS = 8000;
+const SNAPSHOT_INTERVAL_MS = 3000;
 
 export const LiveCameraGrid: React.FC<LiveCameraGridProps> = ({ cameras, onSelectCamera }) => {
   const [activeAIProcessingCams, setActiveAIProcessingCams] = useState<Record<string, boolean>>({});
@@ -17,7 +17,19 @@ export const LiveCameraGrid: React.FC<LiveCameraGridProps> = ({ cameras, onSelec
   const [selectedCam, setSelectedCam] = useState<CameraAsset | null>(null);
   const [snapshotTick, setSnapshotTick] = useState(0);
 
-  const activeCamerasList = useMemo(() => cameras.slice(0, VISIBLE_LIMIT), [cameras]);
+  const activeCamerasList = useMemo(() => {
+    const sorted = [...cameras].sort((a, b) => {
+      const parseCam = (id: string) => {
+        const m = id.toLowerCase().match(/^cam(\d+)$/);
+        return m ? parseInt(m[1], 10) : 9999;
+      };
+      const pa = parseCam(a.camera_id);
+      const pb = parseCam(b.camera_id);
+      if (pa !== pb) return pa - pb;
+      return a.camera_id.localeCompare(b.camera_id);
+    });
+    return sorted.slice(0, VISIBLE_LIMIT);
+  }, [cameras]);
 
   useEffect(() => {
     const interval = setInterval(() => setSnapshotTick((t) => t + 1), SNAPSHOT_INTERVAL_MS);

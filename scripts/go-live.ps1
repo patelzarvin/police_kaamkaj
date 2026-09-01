@@ -53,6 +53,9 @@ if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
 Write-Host "[3/5] Starting backend on :8000..." -ForegroundColor Green
 $env:RENDER_DEMO_MODE = "false"
 $env:ENABLE_LIVE_PIPELINE = "true"
+$env:SENTINEL_RTSP_HOST = "103.250.160.189"
+$env:SENTINEL_RTSP_PORT = "8554"
+if (-not $env:SENTINEL_HLS_PASSWORD) { $env:SENTINEL_HLS_PASSWORD = "ZY86-539G-KZAJ" }
 $uvicornArgs = $pyArgs + @("-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000")
 $backend = Start-Process -PassThru -WindowStyle Minimized -FilePath $python -ArgumentList $uvicornArgs -WorkingDirectory $Root
 Start-Sleep -Seconds 5

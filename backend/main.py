@@ -53,6 +53,9 @@ async def _deferred_pipeline_start():
 async def lifespan(app: FastAPI):
     logger.info("Initializing Gujarat Police Sentinel Core Services...")
     await seed_database()
+    if not RENDER_DEMO_MODE:
+        from backend.camera_sync import sync_sentinel_catalog_to_db
+        await sync_sentinel_catalog_to_db()
     pipeline_task = None
     if not RENDER_DEMO_MODE and settings.ENABLE_LIVE_PIPELINE:
         pipeline_task = asyncio.create_task(_deferred_pipeline_start())

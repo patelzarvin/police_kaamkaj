@@ -125,7 +125,6 @@ class SentinelAIPipeline:
 
     async def process_camera_frame(self, camera_id: str, camera_name: str, lat: float, lon: float, frame_data: Any = None):
         """Process a single real frame from stream worker and update live stream frame."""
-        self._ensure_models()
         if frame_data is None:
             frame_data = self.stream_manager.get_frame(camera_id)
 
@@ -141,8 +140,10 @@ class SentinelAIPipeline:
         annotated_frame = frame.copy()
         h, w, _ = annotated_frame.shape
 
-        # Store latest decoded frame immediately
+        # Publish raw live frame immediately (before heavy YOLO/OCR init)
         global_health_tracker.set_latest_frame(camera_id, annotated_frame)
+
+        self._ensure_models()
 
         # 1. Run YOLO Vehicle Detection in thread pool to prevent event loop blocking
         t0 = time.time()
@@ -299,11 +300,16 @@ class SentinelAIPipeline:
         async with AsyncSessionLocal() as db:
             cams = (await db.execute(select(Camera).where(Camera.status == "ONLINE"))).scalars().all()
 
-        # Prefer seeded demo cameras (CAM-*) then limit total active streams
-        seeded = [c for c in cams if c.camera_id.upper().startswith("CAM-")]
-        others = [c for c in cams if not c.camera_id.upper().startswith("CAM-")]
-        ordered = seeded + others
-        return ordered[: settings.MAX_CONCURRENT_STREAMS]
+        def sort_key(c: Camera) -> tuple:
+            cid = c.camera_id.lower()
+            if cid.startswith("cam") and len(cid) > 3 and cid[3:].isdigit():
+                return (0, int(cid[3:]))
+            if cid.startswith("cam-"):
+                return (1, cid)
+            return (2, cid)
+
+        cams.sort(key=sort_key)
+        return cams[: settings.MAX_CONCURRENT_STREAMS]
 
     async def _ensure_stream_workers(self, cameras: List[Camera]):
         for cam in cameras:
