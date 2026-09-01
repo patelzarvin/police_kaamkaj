@@ -35,6 +35,8 @@ else:
     global_health_tracker = _pipeline_tracker
     stream_manager = StreamManager()
     ai_pipeline = SentinelAIPipeline(stream_manager)
+    import ai.pipeline as _pipeline_mod
+    _pipeline_mod.global_pipeline = ai_pipeline
 
 _health_cache: dict = {"data": None, "expires": 0.0}
 

@@ -41,15 +41,18 @@ async def connect_to_sentinel(req: SentinelConnectRequest):
     # Fetch camera streams
     cameras = sentinel_runtime_client.fetch_cameras()
     
-    # Start stream workers for all discovered cameras to deliver live video
+    # Start stream workers for discovered cameras (uses the same stream manager as the live pipeline)
     try:
-        from ai.pipeline import global_pipeline
-        for cam in cameras:
-            cid = cam["camera_id"]
-            name = cam["name"]
-            rtsp_url = cam["rtsp_url"]
-            global_pipeline.stream_manager.start_camera(cid, name, rtsp_url)
-        logger.info(f"Launched live video stream workers for all {len(cameras)} cameras.")
+        from backend.main import stream_manager
+        if stream_manager is not None:
+            for i, cam in enumerate(cameras[:4]):
+                stream_manager.start_camera(
+                    cam["camera_id"],
+                    cam["name"],
+                    cam["rtsp_url"],
+                    stagger=(i > 0),
+                )
+            logger.info(f"Launched live video stream workers for {min(len(cameras), 4)} cameras.")
     except Exception as e:
         logger.warning(f"Stream worker startup warning: {e}")
 

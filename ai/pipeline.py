@@ -360,4 +360,5 @@ class SentinelAIPipeline:
     def stop(self):
         self.is_running = False
 
-global_pipeline = SentinelAIPipeline()
+# Set by backend.main at startup — do not instantiate a second pipeline here.
+global_pipeline: Optional["SentinelAIPipeline"] = None

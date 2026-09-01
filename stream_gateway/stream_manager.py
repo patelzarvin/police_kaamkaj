@@ -70,6 +70,8 @@ class CameraStreamWorker(threading.Thread):
             try:
                 # Pure Live Sentinel Stream Ingestion (RTSP over TCP / HLS)
                 cap = cv2.VideoCapture(self.stream_source, cv2.CAP_FFMPEG)
+                if cap.isOpened():
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 if not cap.isOpened():
                     self.connection_errors_count += 1
                     self.status = StreamStatus.STREAM_ERROR
@@ -84,14 +86,23 @@ class CameraStreamWorker(threading.Thread):
 
                 fps_count = 0
                 fps_start = time.time()
+                last_decode = 0.0
 
                 while self.is_running and cap.isOpened():
-                    ok, frame = cap.read()
-                    if not ok:
+                    if not cap.grab():
                         logger.warning(f"[{self.camera_id}] Stream EOF / Interruption detected.")
                         self.status = StreamStatus.STREAM_ERROR
                         break
 
+                    now = time.time()
+                    if now - last_decode < settings.STREAM_INGEST_INTERVAL_SEC:
+                        continue
+
+                    ok, frame = cap.retrieve()
+                    if not ok or frame is None:
+                        continue
+
+                    last_decode = now
                     self.total_frames_read += 1
                     fps_count += 1
                     now = time.time()
@@ -116,7 +127,6 @@ class CameraStreamWorker(threading.Thread):
                             pass
 
                     self.frame_queue.put((frame, pts_ms, self.camera_id))
-                    time.sleep(settings.STREAM_INGEST_INTERVAL_SEC)
 
             except Exception as e:
                 logger.error(f"[{self.camera_id}] Stream Exception: {e}")
