@@ -1,26 +1,24 @@
 """Lightweight demo mode for Render.com (no OpenCV / YOLO / live pipeline)."""
-import base64
 import os
 import time
+from io import BytesIO
+
+from PIL import Image, ImageDraw
 
 RENDER_DEMO_MODE = os.getenv("RENDER_DEMO_MODE", "").lower() == "true"
 
-# Minimal 640x360 dark JPEG (no cv2 required)
-_PLACEHOLDER_B64 = (
-    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof"
-    "Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIy"
-    "MjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCABkAoAD"
-    "ASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUF"
-    "BAYHBQgGBwkBAgMRBAUhMQYSQVEHYXETIjKBkQgUobHB0fAjQlKx0fAVM2JygpKissLS0xNTY3ODk6"
-    "Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ip"
-    "qrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEB"
-    "AQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQd"
-    "hcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldY"
-    "WVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPE"
-    "xcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigAooooAK"
-    "KKKACiiigD//Z"
-)
-PLACEHOLDER_JPEG = base64.b64decode(_PLACEHOLDER_B64)
+
+def _build_placeholder_jpeg() -> bytes:
+    img = Image.new("RGB", (640, 360), color=(35, 23, 15))
+    draw = ImageDraw.Draw(img)
+    draw.text((150, 160), "SENTINEL DEMO MODE", fill=(0, 215, 255))
+    draw.text((120, 200), "Render.com — Live AI disabled", fill=(180, 200, 220))
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=70)
+    return buf.getvalue()
+
+
+PLACEHOLDER_JPEG = _build_placeholder_jpeg()
 
 
 class DemoHealthTracker:
